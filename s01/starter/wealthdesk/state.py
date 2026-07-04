@@ -24,8 +24,8 @@ from typing import TypedDict
 # ---------------------------------------------------------------------------
 
 class WealthDeskState(TypedDict):
-    pass  # TODO 3: replace this line with the two field definitions
-
+    customer_message: str
+    response: str
 
 # Guard: raises at import time if the fields haven't been defined yet.
 if "customer_message" not in WealthDeskState.__annotations__:
