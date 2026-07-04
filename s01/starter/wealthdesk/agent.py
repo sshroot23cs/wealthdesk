@@ -40,11 +40,11 @@ from .state import WealthDeskState
 
 def build_graph():
     """Build and compile the WealthDesk LangGraph graph."""
-    # TODO: implement this function
-    pass
+    raise NotImplementedError("TODO 5: implement build_graph() in wealthdesk/agent.py")
 
 
-# Module-level graph instance (used by LangSmith Studio for deployment).
+# Module-level graph instance required by langgraph.json for LangGraph Studio.
+# run() uses this directly rather than building a second copy.
 graph = build_graph()
 
 
@@ -53,8 +53,6 @@ graph = build_graph()
 # ---------------------------------------------------------------------------
 
 def run() -> None:
-    _graph = build_graph()
-
     print("=" * 55)
     print("  WealthDesk | Bharat National Bank")
     print("  Type 'quit' to exit")
@@ -73,7 +71,9 @@ def run() -> None:
             print("\nWealthDesk: Thank you for choosing Bharat National Bank. Goodbye!")
             break
 
-        result = _graph.invoke({"customer_message": user_input, "response": ""})
+        # "response": "" is a placeholder to satisfy the TypedDict contract.
+        # respond() overwrites it; graph.invoke() returns the full merged state.
+        result = graph.invoke({"customer_message": user_input, "response": ""})
         print(f"\nWealthDesk: {result['response']}")
 
 

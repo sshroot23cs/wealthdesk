@@ -38,5 +38,4 @@ from .tools import llm
 
 def respond(state: WealthDeskState) -> dict:
     """Call the LLM and return the agent's reply."""
-    # TODO: implement this node
-    pass
+    raise NotImplementedError("TODO 4: implement respond() in wealthdesk/nodes.py")
