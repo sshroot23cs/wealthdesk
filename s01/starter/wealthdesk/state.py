@@ -26,6 +26,7 @@ from typing import TypedDict
 class WealthDeskState(TypedDict):
     customer_message: str
     response: str
+    history: list[dict[str, str]]  # List of dicts with keys "role" and "content"
 
 # Guard: raises at import time if the fields haven't been defined yet.
 if "customer_message" not in WealthDeskState.__annotations__:

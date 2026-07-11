@@ -10,42 +10,27 @@ Run the agent from the repo root:
 Session 1 graph:
     START --> respond --> END
 """
+import sqlite3 
+from uuid import uuid4 
+
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
 
 from .nodes import respond
 from .state import WealthDeskState
+from .config import CHECKPOINT_DB
 
-
-# ---------------------------------------------------------------------------
-# TODO 5 of 5 -- build_graph
-# ---------------------------------------------------------------------------
-# Implement build_graph() so it:
-#
-#   1. Creates a StateGraph:
-#        builder = StateGraph(WealthDeskState)
-#
-#   2. Registers the respond node:
-#        builder.add_node("respond", respond)
-#
-#   3. Sets the entry point (first node to run):
-#        builder.set_entry_point("respond")
-#
-#   4. Connects respond → END (the graph exits after one response):
-#        builder.add_edge("respond", END)
-#
-#   5. Compiles and returns the graph:
-#        return builder.compile()
-#
-# ---------------------------------------------------------------------------
-
-def build_graph():
+def build_graph(checkpointer=None):
     """Build and compile the WealthDesk LangGraph graph."""
     try:
         builder = StateGraph(WealthDeskState)
         builder.add_node("respond", respond)
         builder.set_entry_point("respond")
         builder.add_edge("respond", END)
-        return builder.compile()
+        if checkpointer is None:
+            checkpointer = MemorySaver()
+        return builder.compile(checkpointer=checkpointer)
     except Exception as e:
         print(f"[WealthDesk] Error building graph: {e}")
         raise
@@ -61,6 +46,13 @@ graph = build_graph()
 # ---------------------------------------------------------------------------
 
 def run() -> None:
+    """Run the WealthDesk agent in a terminal loop."""
+    # Connect to the SQLite database for persistent checkpoints
+    conn = sqlite3.connect(str(CHECKPOINT_DB), check_same_thread=False)
+    # Build a new graph instance with the SQLite checkpointer
+    _graph    = build_graph(checkpointer=SqliteSaver(conn))
+    thread_id = str(uuid4())
+    config    = {"configurable": {"thread_id": thread_id}}
     print("=" * 55)
     print("  WealthDesk | Bharat National Bank")
     print("  Type 'quit' to exit")
@@ -81,7 +73,7 @@ def run() -> None:
 
         # "response": "" is a placeholder to satisfy the TypedDict contract.
         # respond() overwrites it; graph.invoke() returns the full merged state.
-        result = graph.invoke({"customer_message": user_input, "response": ""})
+        result = _graph.invoke({"customer_message": user_input, "response": ""}, config=config)
         print(f"\nWealthDesk: {result['response']}")
 
 
