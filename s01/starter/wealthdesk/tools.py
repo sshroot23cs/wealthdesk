@@ -39,7 +39,8 @@ classifer_llm = ChatGroq(
     max_tokens=CLASSIFICATION_MAX_TOKENS,
 )
 
-print("=" * 55)
-print(f"Intent Classification is done by LangGraph LLM Model: {classifer_llm.model}, with temperature {classifer_llm.temperature}")
-print(f"Responses Generation is done by LangGraph LLM Model: {llm.model}, with temperature {llm.temperature}")
-print("=" * 55)
+print("X" * 55)
+print(f"    WealthDesk LLM MODELS:")
+print(f"    Intent Classification Model: {classifer_llm.model}, with temperature {classifer_llm.temperature}")
+print(f"    Responses Generation Model: {llm.model}, with temperature {llm.temperature}")
+print("X" * 55)
