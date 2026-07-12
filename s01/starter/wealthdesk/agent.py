@@ -17,7 +17,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
 
-from .nodes import respond
+from .nodes import respond, classify, escalate, decline, route_query
 from .state import WealthDeskState
 from .config import CHECKPOINT_DB
 
@@ -25,8 +25,22 @@ def build_graph(checkpointer=None):
     """Build and compile the WealthDesk LangGraph graph."""
     try:
         builder = StateGraph(WealthDeskState)
+        # START -> Classify -> route query -> respond / escalate / decline -> end
+        # start node classify
+        # then either of respond, escalate, decline node
+        # then end node
+        builder.add_node("classify", classify)
+        builder.add_node("escalate", escalate)
+        builder.add_node("decline", decline)
         builder.add_node("respond", respond)
-        builder.set_entry_point("respond")
+        builder.set_entry_point("classify")
+        builder.add_conditional_edges("classify", route_query, {
+            "respond": "respond",
+            "escalate": "escalate",
+            "decline": "decline"
+        })
+        builder.add_edge("escalate", END)
+        builder.add_edge("decline", END)
         builder.add_edge("respond", END)
         if checkpointer is None:
             checkpointer = MemorySaver()
@@ -56,6 +70,7 @@ def run() -> None:
     print("=" * 55)
     print("  WealthDesk | Bharat National Bank")
     print("  Type 'quit' to exit")
+    print("  Session ID:", thread_id)
     print("=" * 55)
 
     while True:
@@ -74,6 +89,8 @@ def run() -> None:
         # "response": "" is a placeholder to satisfy the TypedDict contract.
         # respond() overwrites it; graph.invoke() returns the full merged state.
         result = _graph.invoke({"customer_message": user_input, "response": ""}, config=config)
+        route = result.get("query_type", "?")
+        print(f"\n[Routed: {route}]")
         print(f"\nWealthDesk: {result['response']}")
 
 
