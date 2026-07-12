@@ -39,8 +39,25 @@ classifer_llm = ChatGroq(
     max_tokens=CLASSIFICATION_MAX_TOKENS,
 )
 
-print("X" * 55)
-print(f"    WealthDesk LLM MODELS:")
-print(f"    Intent Classification Model: {classifer_llm.model}, with temperature {classifer_llm.temperature}")
-print(f"    Responses Generation Model: {llm.model}, with temperature {llm.temperature}")
-print("X" * 55)
+_BOX_WIDTH = 100
+_BOX_INNER_WIDTH = _BOX_WIDTH - 4  # "X " prefix + " X" suffix
+_box_lines = [
+    "✻ WealthDesk Agent",
+    "",
+    f"Intent Classification Model: {classifer_llm.model}, with temperature {classifer_llm.temperature}",
+    f"Responses Generation Model: {llm.model}, with temperature {llm.temperature}",
+    "",
+    "Built By: Sushrut Hole",
+]
+
+
+def _print_box(lines, inner_width):
+    print("╭" + "─" * (inner_width + 2) + "╮")
+    for line in lines:
+        if len(line) > inner_width:
+            line = line[: inner_width - 3] + "..."
+        print(f"│ {line:<{inner_width}} │")
+    print("╰" + "─" * (inner_width + 2) + "╯")
+
+
+_print_box(_box_lines, _BOX_INNER_WIDTH)
