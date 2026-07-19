@@ -11,8 +11,9 @@ from typing import TypedDict
 class WealthDeskState(TypedDict):
     customer_message: str
     response: str
-    history: list[dict[str, str]]  # List of dicts with keys "role" and "content"4
+    history: list[dict[str, str]]  # List of dicts with keys "role" and "content"
     query_type: str  # SIMPLE, COMPLEX, or OUT_OF_SCOPE
+    retrieved_docs: list[str]  # List of text chunks retrieved for RAG context
 
 # Guard: raises at import time if the fields haven't been defined yet.
 if "customer_message" not in WealthDeskState.__annotations__:

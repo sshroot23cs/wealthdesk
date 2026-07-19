@@ -32,7 +32,7 @@ llm = ChatGroq(
 
 # classification model is deterministic, so we set temperature to 0.0 
 # can configure a separate model for classification if needed, but for now we use the same model with different temperature
-classifer_llm = ChatGroq(
+classifier_llm = ChatGroq(
     api_key=GROQ_API_KEY,
     model=CLASSIFICATION_MODEL_NAME,
     temperature=CLASSIFICATION_TEMPERATURE,  # deterministic classification
@@ -42,9 +42,9 @@ classifer_llm = ChatGroq(
 _BOX_WIDTH = 100
 _BOX_INNER_WIDTH = _BOX_WIDTH - 4  # "X " prefix + " X" suffix
 _box_lines = [
-    "✻ WealthDesk Agent",
+    "* WealthDesk Agent",
     "",
-    f"Intent Classification Model: {classifer_llm.model}, with temperature {classifer_llm.temperature}",
+    f"Intent Classification Model: {classifier_llm.model}, with temperature {classifier_llm.temperature}",
     f"Responses Generation Model: {llm.model}, with temperature {llm.temperature}",
     "",
     "Built By: Sushrut Hole",
@@ -52,12 +52,15 @@ _box_lines = [
 
 
 def _print_box(lines, inner_width):
-    print("╭" + "─" * (inner_width + 2) + "╮")
+    # Plain ASCII only: this runs at import time, and some hosts (e.g. langgraph
+    # dev's worker threads on Windows) redirect stdout through a non-UTF-8 codec,
+    # which raises UnicodeEncodeError on box-drawing characters and aborts the import.
+    print("+" + "-" * (inner_width + 2) + "+")
     for line in lines:
         if len(line) > inner_width:
             line = line[: inner_width - 3] + "..."
-        print(f"│ {line:<{inner_width}} │")
-    print("╰" + "─" * (inner_width + 2) + "╯")
+        print(f"| {line:<{inner_width}} |")
+    print("+" + "-" * (inner_width + 2) + "+")
 
 
 _print_box(_box_lines, _BOX_INNER_WIDTH)

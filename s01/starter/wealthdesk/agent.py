@@ -10,6 +10,7 @@ Run the agent from the repo root:
 Session 1 graph:
     START --> respond --> END
 """
+import os
 import sqlite3 
 from uuid import uuid4 
 
@@ -17,9 +18,9 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
 
-from .nodes import respond, classify, escalate, decline, route_query
+from .nodes import respond, classify, escalate, decline, retrieve_docs, route_query
 from .state import WealthDeskState
-from .config import CHECKPOINT_DB
+from .config import CHECKPOINT_DB, ESCALATE_RESPONSE
 
 def build_graph(checkpointer=None):
     """Build and compile the WealthDesk LangGraph graph."""
@@ -30,16 +31,15 @@ def build_graph(checkpointer=None):
         # then either of respond, escalate, decline node
         # then end node
         builder.add_node("classify", classify)
-        builder.add_node("escalate", escalate)
+        builder.add_node("retrieve_docs", retrieve_docs)
         builder.add_node("decline", decline)
         builder.add_node("respond", respond)
         builder.set_entry_point("classify")
         builder.add_conditional_edges("classify", route_query, {
-            "respond": "respond",
-            "escalate": "escalate",
+            "retrieve_docs": "retrieve_docs",
             "decline": "decline"
         })
-        builder.add_edge("escalate", END)
+        builder.add_edge("retrieve_docs", "respond")
         builder.add_edge("decline", END)
         builder.add_edge("respond", END)
         if checkpointer is None:
@@ -72,6 +72,12 @@ def run() -> None:
     print("  Type 'quit' to exit")
     print("  Session ID:", thread_id)
     print("=" * 55)
+    # sanity check -- confirms config actually reached graph.invoke()
+    if os.getenv("LANGSMITH_TRACING", "").lower() == "true":
+        project = os.getenv("LANGSMITH_PROJECT", "batch1-wealthdesk")
+        print(f"  Tracing : LangSmith ({project})")
+    print("=" * 55)
+    
 
     while True:
         try:
@@ -90,6 +96,17 @@ def run() -> None:
         # respond() overwrites it; graph.invoke() returns the full merged state.
         result = _graph.invoke({"customer_message": user_input, "response": ""}, config=config)
         route = result.get("query_type", "?")
+        retrieved_docs = result.get("retrieved_docs", [])
+        response = result.get("response", [])
+        if retrieved_docs and response != ESCALATE_RESPONSE:
+            print(f"\n[Retrieved {len(retrieved_docs)} docs]")
+            # print the content of the retrieved docs for debugging
+            print(f"\n[Retrieved docs content]")
+            for i, doc in enumerate(retrieved_docs, start=1):
+                print(f"\n[Doc {i}]\n{doc}")
+
+        else:
+            print(f"\n[No relevant docs retrieved]")
         print(f"\n[Routed: {route}]")
         print(f"\nWealthDesk: {result['response']}")
 
