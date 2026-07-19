@@ -42,8 +42,9 @@ def build_graph(checkpointer=None):
         builder.add_edge("retrieve_docs", "respond")
         builder.add_edge("decline", END)
         builder.add_edge("respond", END)
-        if checkpointer is None:
-            checkpointer = MemorySaver()
+        # commented as  langraph studio was not working with checkpointer as MemorySaver
+        # if checkpointer is None:
+        #     checkpointer = MemorySaver()
         return builder.compile(checkpointer=checkpointer)
     except Exception as e:
         print(f"[WealthDesk] Error building graph: {e}")
