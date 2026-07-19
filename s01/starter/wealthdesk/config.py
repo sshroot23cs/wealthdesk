@@ -9,7 +9,7 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 # Model settings (provided -- no changes needed) for reponse generation and classification
 # ---------------------------------------------------------------------------
-MODEL_NAME  = "llama-3.3-70b-versatile"
+MODEL_NAME  = "llama3.3"
 TEMPERATURE = 0.3
 MAX_TOKENS  = 300
 
@@ -17,7 +17,7 @@ MAX_TOKENS  = 300
 # Model settings (provided -- no changes needed) for intent classification
 # ---------------------------------------------------------------------------
 # CLASSIFICATION_MODEL_NAME  = "meta-llama/llama-4-scout-17b-16e-instruct"
-CLASSIFICATION_MODEL_NAME = "llama3.3:70b"
+CLASSIFICATION_MODEL_NAME = "llama3.3"
 CLASSIFICATION_TEMPERATURE = 0.0  # deterministic classification
 CLASSIFICATION_MAX_TOKENS  = 10
 
