@@ -8,7 +8,7 @@ Each node is a plain Python function:
   - Output: a dict containing ONLY the keys this node changed
              (LangGraph merges it into the state automatically)
 """
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, ToolMessage
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from .config import (
@@ -16,7 +16,7 @@ from .config import (
     EMBED_MODEL,VECTORSTORE_DIR, RETRIEVAL_K,RETRIEVAL_SCORE_THRESHOLD
 )
 from .state import WealthDeskState
-from .tools import llm, classifier_llm
+from .tools import llm, classifier_llm, llm_with_tools, _run_tool
  
 vectorstore = None  # shared across calls; initialised once by _init_vectorstore()
  
@@ -36,26 +36,22 @@ def _init_vectorstore() -> None:
         print("  Run 'python data/ingest.py' to create it.")
  
  
- 
 def classify(state: WealthDeskState) -> dict:
-    """Call the LLM and return the agent's reply."""
-    valid_types = {"IN_SCOPE", "OUT_OF_SCOPE"}
-   
+    """Updated in Session 5: now classifies into SIMPLE / COMPLEX / OUT_OF_SCOPE."""
     messages = [
         SystemMessage(content=CLASSIFY_SYSTEM_PROMPT),
         HumanMessage(content=state["customer_message"]),
     ]
- 
     try:
-       result = classifier_llm.invoke(messages)
-       query_type = result.content.strip().upper()
-       if query_type not in valid_types:
-          query_type = "IN_SCOPE"
+        result     = classifier_llm.invoke(messages)
+        query_type = result.content.strip().upper()
+        if query_type not in {"SIMPLE", "COMPLEX", "OUT_OF_SCOPE"}:
+            query_type = "SIMPLE"
     except Exception as e:
         print(f"[WealthDesk] Classification error: {e}")
-        query_type = "IN_SCOPE"
- 
+        query_type = "SIMPLE"
     return {"query_type": query_type, "retrieved_docs": []}
+
  
 def retrieve_docs(state: WealthDeskState) -> dict:
     _init_vectorstore()
@@ -113,9 +109,29 @@ def respond(state: WealthDeskState) -> dict:
           messages.append(HumanMessage(content=turn["content"]))
        else:
           messages.append(AIMessage(content=turn["content"]))
+
     messages.append(HumanMessage(content=state["customer_message"]))
     try:
-      result = llm.invoke(messages)
+      result = llm_with_tools.invoke(messages)
+      if result.invalid_tool_calls:
+        for itc in result.invalid_tool_calls: 
+            print(f"[WealthDesk] Invalid tool call: {itc.get('tool_name', 'unknown')} - ({itc.get('tool_input', {})}) - {itc.get('error', 'unknown error')}")
+      max_tool_rounds = 5
+      tool_rounds     = 0
+      while result.tool_calls and tool_rounds < max_tool_rounds:
+        messages.append(result)
+        for tool_call in result.tool_calls:
+            print(f"[WealthDesk] Tool call: {tool_call.get('name', 'unknown')} - ({tool_call.get('args', {})})")
+            tool_name = tool_call.get("name")
+            tool_input = tool_call.get("args", {})
+            if not tool_name:
+                print(f"[WealthDesk] Tool call missing 'tool_name': {tool_name} in tool_call: {tool_call}")
+                continue
+            tool_output = _run_tool(tool_name, tool_input)
+            messages.append(ToolMessage(content=str(tool_output), tool_call_id=tool_call.get("id")))
+        tool_rounds += 1
+        result = llm_with_tools.invoke(messages)
+
       response_text = result.content
     except Exception as e:
         print(f"[WealthDesk] LLM error: {e}")
