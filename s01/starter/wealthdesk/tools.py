@@ -184,22 +184,6 @@ def query_branch(city: str = "all") -> str:
     return "\n\n".join(parts)
  
 
-
-# ---------------------------------------------------------------------------
-# TODO 3 of 4 -- Bind tools to the LLM
-# ---------------------------------------------------------------------------
-# Create llm_with_tools by binding both tools to llm:
-#   llm_with_tools = llm.bind_tools([query_rates, query_branch])
-#
-# bind_tools() reads each function's type hints and docstring, converts them to a
-# JSON schema, and includes that schema in every request. The LLM was fine-tuned
-# on examples with this schema format, so it knows to output a structured tool call
-# instead of guessing the answer from memory.
-# llm_with_tools is used for the FIRST call in respond(). The second call
-# (after tools have run) uses plain llm.
-# ---------------------------------------------------------------------------
-# TODO: add llm_with_tools = llm.bind_tools([query_rates, query_branch])
-
 AVAILABLE_TOOLS = [query_rates, query_branch]
 
 def _run_tool(tool_name: str, tool_args: dict) -> str:

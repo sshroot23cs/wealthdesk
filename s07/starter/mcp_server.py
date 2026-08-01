@@ -54,6 +54,41 @@ DB_PATH  = DATA_DIR / "bnb_data.db"
 #       The only difference: @tool becomes @mcp.tool() (already in place).
 # ---------------------------------------------------------------------------
 
+
+def _get_db_connection(db_path: str) -> sqlite3.Connection:
+    """Open a SQLite connection to the given database path.
+
+    check_same_thread=False: SQLite normally raises ProgrammingError if a connection
+    is used from a thread other than the one that created it. LangGraph runs tool calls
+    in a thread-pool executor, so the tool may execute on a different thread than the
+    one that opened the connection. This flag disables that check.
+    """
+    try:
+        return sqlite3.connect(str(db_path), check_same_thread=False)
+    except Exception as e:
+        raise RuntimeError(f"Could not connect to database at {db_path}: {e}")
+
+
+def _execute_query(sql: str, params: tuple = ()) -> list:
+    """Open a connection, run a single query, and return all rows.
+
+    Single choke point for every SQL query the tools issue: owns the connection's
+    open/close lifecycle and turns any DB-layer failure (locked file, malformed SQL,
+    corrupt db, etc.) into a RuntimeError with context, instead of letting a raw
+    sqlite3 exception surface to the caller. Callers (query_rates, query_branch) don't
+    need their own try/except/close around each query -- _run_tool already catches
+    exceptions raised by tools and reports them back as a "Tool error" string.
+    """
+    conn = None
+    try:
+        conn = _get_db_connection(DB_PATH)
+        return conn.execute(sql, params).fetchall()
+    except sqlite3.Error as e:
+        raise RuntimeError(f"Database query failed: {e}") from e
+    finally:
+        if conn is not None:
+            conn.close()
+
 @mcp.tool()
 def query_rates(product_type: str = "all") -> str:
     """Fetch current BNB interest rates from the database.
@@ -66,17 +101,30 @@ def query_rates(product_type: str = "all") -> str:
 
     Returns formatted rate information as a plain-text string.
     """
-    # TODO 1: Connect to DB_PATH with sqlite3.connect()
-    # If product_type is "loan" or "all":
-    #   SELECT name, interest_rate, tenure_min_years, tenure_max_years
-    #   FROM loan_products ORDER BY interest_rate
-    #   Append each row as: f"{name}: {rate:.1f}% p.a., tenure {min_y}-{max_y} years"
-    # If product_type is "fd" or "all":
-    #   SELECT tenure_label, interest_rate, senior_rate
-    #   FROM fd_products ORDER BY tenure_months
-    #   Append each row as: f"FD {label}: {rate:.1f}% p.a. (senior citizens: {rate+senior:.1f}%)"
-    # Close the connection and return "\n".join(lines) or "No rate data found."
-    raise NotImplementedError("TODO 1: implement the SQL queries for query_rates()")
+    lines = []
+    product_type = product_type.lower()
+
+    if product_type in ("loan", "all"):
+        rows = _execute_query(
+            "SELECT name, interest_rate, tenure_min_years, tenure_max_years "
+            "FROM loan_products ORDER BY interest_rate"
+        )
+        for name, rate, min_y, max_y in rows:
+            lines.append(f"{name}: {rate:.2f}% p.a., tenure {min_y}-{max_y} years")
+
+    if product_type in ("fd", "all"):
+        rows = _execute_query(
+            "SELECT tenure_label, interest_rate, senior_rate "
+            "FROM fd_products ORDER BY tenure_months"
+        )
+        for label, rate, senior in rows:
+            lines.append(
+                f"FD {label}: {rate:.2f}% p.a. "
+                f"(senior citizens: {rate + senior:.2f}%, extra +{senior:.2f}%)"
+            )
+
+    return "\n".join(lines) if lines else "No rate data found."
+   
 
 
 # ---------------------------------------------------------------------------
@@ -95,18 +143,40 @@ def query_branch(city: str = "all") -> str:
 
     Returns branch names, addresses, IFSC codes, and phone numbers.
     """
-    # TODO 2: Connect to DB_PATH with sqlite3.connect()
-    # If city.lower() == "all":
-    #   SELECT name, city, address, ifsc, phone FROM branches ORDER BY city, name
-    # Else (filter by city):
-    #   SELECT name, city, address, ifsc, phone FROM branches
-    #   WHERE city LIKE ? ORDER BY name
-    #   Pass (f"%{city}%",) as the parameter -- never interpolate city into the SQL string
-    # If no rows found: return f"No BNB branches found for city: '{city}'."
-    # Format each branch as:
-    #   f"{name} ({city_})\n  Address: {address}\n  IFSC: {ifsc}  |  Phone: {phone}"
-    # Return branches joined by "\n\n"
-    raise NotImplementedError("TODO 2: implement the SQL queries for query_branch()")
+    if city.lower() == "all":
+
+        rows = _execute_query(
+            "SELECT name, city, address, ifsc, phone FROM branches ORDER BY city, name"
+        )
+
+    else:
+
+        rows = _execute_query(
+            "SELECT name, city, address, ifsc, phone "
+            "FROM branches WHERE city LIKE ? ORDER BY name",
+            (f"%{city}%",),
+        )
+
+        if not rows:
+            # Neighbourhood names (e.g. "Andheri West", "Koramangala") are stored
+            # in the branch name, not the city column — retry by name.
+            rows = _execute_query(
+                "SELECT name, city, address, ifsc, phone "
+                "FROM branches WHERE name LIKE ? ORDER BY name",
+                (f"%{city}%",),
+            )
+
+    if not rows:
+        return f"No BNB branches found for city: '{city}'."
+ 
+    parts = []
+    for name, city_, address, ifsc, phone in rows:
+        parts.append(
+            f"{name} ({city_})\n"
+            f"  Address: {address}\n"
+            f"  IFSC: {ifsc}  |  Phone: {phone}"
+        )
+    return "\n\n".join(parts)
 
 
 # ---------------------------------------------------------------------------
