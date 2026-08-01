@@ -8,24 +8,12 @@ Only define the shape here -- no logic.
 """
 from typing import TypedDict
 
-
-# ---------------------------------------------------------------------------
-# TODO 3 of 5 -- State definition
-# ---------------------------------------------------------------------------
-# Define WealthDeskState as a TypedDict with exactly two fields:
-#
-#   customer_message : str   -- the question the customer typed
-#   response         : str   -- the answer WealthDesk will return
-#
-# Pattern:
-#   class WealthDeskState(TypedDict):
-#       field_name: type
-#
-# ---------------------------------------------------------------------------
-
 class WealthDeskState(TypedDict):
-    pass  # TODO 3: replace this line with the two field definitions
-
+    customer_message: str
+    response: str
+    history: list[dict[str, str]]  # List of dicts with keys "role" and "content"
+    query_type: str  # SIMPLE, COMPLEX, or OUT_OF_SCOPE
+    retrieved_docs: list[str]  # List of text chunks retrieved for RAG context
 
 # Guard: raises at import time if the fields haven't been defined yet.
 if "customer_message" not in WealthDeskState.__annotations__:

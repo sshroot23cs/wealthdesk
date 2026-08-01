@@ -127,6 +127,23 @@ wealthdesk/
 
 ---
 
+## Running the Agent
+
+```
+# From the wealthdesk/ directory -- cd into the session's starter folder:
+cd s01/starter
+python -m wealthdesk.agent
+
+# For a later session, use that session's starter folder instead, e.g.:
+cd s02/starter
+python -m wealthdesk.agent
+```
+
+Note: use `-m wealthdesk.agent` (not `python wealthdesk/agent.py`), and run it from
+inside the `starter/` folder so `wealthdesk` is importable as a package.
+
+---
+
 ## Running the Tests
 
 ```
