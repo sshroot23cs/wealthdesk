@@ -98,3 +98,8 @@ VECTORSTORE_DIR = DATA_DIR / "vectorstore"
 EMBED_MODEL               = "all-MiniLM-L6-v2"
 RETRIEVAL_K               = 3
 RETRIEVAL_SCORE_THRESHOLD = 0.3
+
+# ---------------------------------------------------------------------------
+# Path to the MCP server script (s07/starter/mcp_server.py)
+# ---------------------------------------------------------------------------
+MCP_SERVER_PATH = Path(__file__).parent.parent.parent.parent / "s07" / "starter" / "mcp_server.py"

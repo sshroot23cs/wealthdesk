@@ -119,20 +119,17 @@ def respond(state: WealthDeskState) -> dict:
       max_tool_rounds = 5
       tool_rounds     = 0
       while result.tool_calls and tool_rounds < max_tool_rounds:
-        messages.append(result)
-        for tool_call in result.tool_calls:
-            print(f"[WealthDesk] Tool call: {tool_call.get('name', 'unknown')} - ({tool_call.get('args', {})})")
-            tool_name = tool_call.get("name")
-            tool_input = tool_call.get("args", {})
-            if not tool_name:
-                print(f"[WealthDesk] Tool call missing 'tool_name': {tool_name} in tool_call: {tool_call}")
-                continue
-            tool_output = _run_tool(tool_name, tool_input)
-            messages.append(ToolMessage(content=str(tool_output), tool_call_id=tool_call.get("id")))
-        tool_rounds += 1
-        result = llm_with_tools.invoke(messages)
-
-      response_text = result.content
+            messages.append(result)
+            for tc in result.tool_calls:
+                tool_output = _run_tool(tc["name"], tc["args"])
+                print(
+                    f"[WealthDesk] MCP tool: {tc['name']}({tc['args']}) "
+                    f"-> {str(tool_output)[:80]}"
+                )
+                messages.append(ToolMessage(content=str(tool_output), tool_call_id=tc["id"]))
+            tool_rounds += 1
+            result = llm_with_tools.invoke(messages)
+      response_text = result.content or ""
     except Exception as e:
         print(f"[WealthDesk] LLM error: {e}")
         return {"response": "I am temporarily unavailable. Please try again in a moment."}
