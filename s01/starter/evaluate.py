@@ -41,6 +41,8 @@ How this file is organised
 import json
 import os
 import sys
+from datetime import datetime
+from html import escape
 from pathlib import Path
  
 from dotenv import load_dotenv
@@ -74,6 +76,7 @@ PASS_SCORE  = 3
  
 DATA_DIR     = Path(__file__).parent.parent / "data"
 DATASET_PATH = DATA_DIR / "golden_dataset.json"
+REPORTS_DIR  = Path(__file__).parent / "reports"
  
 # ---------------------------------------------------------------------------
 # LLM judge
@@ -515,8 +518,116 @@ def print_report(report: dict) -> None:
             print(f"    {f['id']}: (route={f['actual_route']}, score={f['score']}) {f['query'][:55]}")
             print(f"         {f['reason']}")
     print("=" * 60)
- 
- 
+
+
+def generate_html_report(report: dict) -> str:
+    """Render the evaluation report as a single self-contained HTML page.
+
+    Mirrors print_report's content (summary stats, per-category bar chart,
+    failure list) but as styled HTML instead of ASCII, so it can be opened
+    in a browser or shared as a file.
+    """
+    category_rows = "\n".join(
+        f"""        <tr>
+          <td>{escape(cat)}</td>
+          <td>
+            <div class="bar">
+              <div class="bar-passed" style="width:{data['pass_rate'] * 100:.0f}%"></div>
+            </div>
+          </td>
+          <td>{data['passed']}/{data['total']}</td>
+          <td>{data['pass_rate']:.0%}</td>
+        </tr>"""
+        for cat, data in sorted(report["by_category"].items())
+    )
+
+    if report["failures"]:
+        failure_rows = "\n".join(
+            f"""        <tr>
+          <td>{escape(f['id'])}</td>
+          <td>{escape(f['actual_route'])}</td>
+          <td>{f['score']}</td>
+          <td>{escape(f['query'])}</td>
+          <td>{escape(f['reason'])}</td>
+        </tr>"""
+            for f in report["failures"]
+        )
+        failures_section = f"""
+      <h2>Failed items ({len(report['failures'])})</h2>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Route</th><th>Score</th><th>Query</th><th>Reason</th></tr>
+        </thead>
+        <tbody>
+{failure_rows}
+        </tbody>
+      </table>"""
+    else:
+        failures_section = "\n      <p class=\"all-passed\">All items passed.</p>"
+
+    generated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>WealthDesk Baseline Evaluation Report</title>
+<style>
+  body {{ font-family: -apple-system, Segoe UI, Arial, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }}
+  h1 {{ margin-bottom: 0.25rem; }}
+  .timestamp {{ color: #666; font-size: 0.9rem; margin-top: 0; }}
+  .summary {{ display: flex; gap: 1.5rem; flex-wrap: wrap; margin: 1.5rem 0; }}
+  .stat {{ background: #f5f5f5; border-radius: 8px; padding: 0.75rem 1.25rem; min-width: 120px; }}
+  .stat .label {{ font-size: 0.8rem; color: #666; }}
+  .stat .value {{ font-size: 1.5rem; font-weight: 600; }}
+  table {{ border-collapse: collapse; width: 100%; margin: 1rem 0; }}
+  th, td {{ text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e0e0e0; }}
+  th {{ background: #fafafa; font-size: 0.85rem; text-transform: uppercase; color: #666; }}
+  .bar {{ background: #eee; border-radius: 4px; width: 160px; height: 10px; overflow: hidden; }}
+  .bar-passed {{ background: #2e7d32; height: 100%; }}
+  .all-passed {{ color: #2e7d32; font-weight: 600; }}
+  .pass-rate {{ color: #2e7d32; }}
+</style>
+</head>
+<body>
+  <h1>WealthDesk Baseline Evaluation Report</h1>
+  <p class="timestamp">Generated {generated_at}</p>
+
+  <div class="summary">
+    <div class="stat"><div class="label">Total</div><div class="value">{report['total']}</div></div>
+    <div class="stat"><div class="label">Passed</div><div class="value">{report['passed']}</div></div>
+    <div class="stat"><div class="label">Failed</div><div class="value">{report['failed']}</div></div>
+    <div class="stat"><div class="label">Pass rate</div><div class="value pass-rate">{report['pass_rate']:.0%}</div></div>
+    <div class="stat"><div class="label">Avg SIMPLE score</div><div class="value">{report['average_score']} / 5</div></div>
+  </div>
+
+  <h2>By category</h2>
+  <table>
+    <thead>
+      <tr><th>Category</th><th>Pass rate</th><th>Passed</th><th>%</th></tr>
+    </thead>
+    <tbody>
+{category_rows}
+    </tbody>
+  </table>
+{failures_section}
+</body>
+</html>
+"""
+
+
+def write_html_report(report: dict, output_dir: Path = REPORTS_DIR) -> Path:
+    """Write the HTML report to disk and return the path to the file.
+
+    Filenames are timestamped so successive runs don't overwrite each other.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    timestamp   = datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_path = output_dir / f"eval_report_{timestamp}.html"
+    report_path.write_text(generate_html_report(report), encoding="utf-8")
+    return report_path
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -557,6 +668,9 @@ def main() -> None:
     results = run_evaluation(graph, dataset)
     report  = generate_report(results)
     print_report(report)
+
+    html_path = write_html_report(report)
+    print(f"\n  HTML report: {html_path.resolve().as_uri()}")
  
  
 if __name__ == "__main__":
