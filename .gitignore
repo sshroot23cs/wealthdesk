@@ -28,6 +28,7 @@ s11/
 s12/
 
 # Generated files -- recreate with seed.py and ingest.py
+s*/*/reports/
 data/bnb_data.db
 data/checkpoints.db
 data/checkpoints.db-shm
@@ -54,3 +55,6 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+data/checkpoints*
+data/checkpoints.db-shm
+data/checkpoints.db-wal
